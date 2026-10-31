@@ -6,7 +6,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -28,8 +27,8 @@ public class Instrument {
     @Column(name = "current_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal currentPrice;
 
-    // Hibernate sets this on insert and on every update, so price changes are timestamped automatically
-    @UpdateTimestamp
+    // Set in Java rather than via @UpdateTimestamp: Hibernate only fills that at flush (commit) time,
+    // which is after the service has already built its response, so the API would return a stale value.
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -40,10 +39,12 @@ public class Instrument {
         this.symbol = symbol;
         this.name = name;
         this.currentPrice = currentPrice;
+        this.updatedAt = Instant.now();
     }
 
     public void updatePrice(BigDecimal newPrice) {
         this.currentPrice = newPrice;
+        this.updatedAt = Instant.now();
     }
 
     public Long getId() {

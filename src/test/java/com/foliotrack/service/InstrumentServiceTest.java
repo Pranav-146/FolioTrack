@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,6 +45,7 @@ class InstrumentServiceTest {
     void updatePriceChangesEntityAndReturnsResponse() {
         Instrument aapl = new Instrument("AAPL", "Apple Inc.", new BigDecimal("227.50"));
         when(instrumentRepository.findBySymbol("AAPL")).thenReturn(Optional.of(aapl));
+        Instant beforeUpdate = Instant.now();
 
         InstrumentResponse response = instrumentService.updatePrice("AAPL", new BigDecimal("250.00"));
 
@@ -51,6 +53,8 @@ class InstrumentServiceTest {
         assertThat(aapl.getCurrentPrice()).isEqualTo("250.00");
         assertThat(response.symbol()).isEqualTo("AAPL");
         assertThat(response.currentPrice()).isEqualTo("250.00");
+        // The response must carry the new timestamp, not the one from before the update
+        assertThat(response.updatedAt()).isAfterOrEqualTo(beforeUpdate);
     }
 
     @Test

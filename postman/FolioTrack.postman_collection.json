@@ -1,0 +1,1199 @@
+{
+  "info": {
+    "name": "FolioTrack API",
+    "description": "End-to-end tests for every FolioTrack endpoint. Run the folders in order (they share state through collection variables). Uses the seeded data: pick a user with no KO holding (default userId=2). Each run adds two REJECTED orders, which is expected: rejections are kept for audit.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (pm.response.code >= 400) {",
+          "    pm.test(\"Error body has the standard ApiError shape\", function () {",
+          "        const body = pm.response.json();",
+          "        pm.expect(body).to.have.all.keys(\"timestamp\", \"status\", \"error\", \"message\", \"path\", \"fieldErrors\");",
+          "        pm.expect(body.status).to.eql(pm.response.code);",
+          "        pm.expect(body.message).to.be.a(\"string\").and.not.empty;",
+          "        pm.expect(body.path).to.eql(\"/\" + pm.request.url.path.join(\"/\"));",
+          "        pm.expect(body.fieldErrors).to.be.an(\"array\");",
+          "        pm.expect(new Date(body.timestamp).toString()).to.not.eql(\"Invalid Date\");",
+          "    });",
+          "}",
+          "pm.test(\"Response time is under 2s\", function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [],
+  "item": [
+    {
+      "name": "Instruments",
+      "description": "GET /api/instruments and PUT /api/instruments/{symbol}/price",
+      "item": [
+        {
+          "name": "List instruments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/instruments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "instruments"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const list = pm.response.json();",
+                  "pm.test(\"Returns the seeded instruments sorted by symbol\", function () {",
+                  "    pm.expect(list).to.be.an(\"array\").with.length.at.least(10);",
+                  "    const symbols = list.map(i => i.symbol);",
+                  "    pm.expect(symbols).to.include.members([\"AAPL\", \"MSFT\", \"KO\"]);",
+                  "    pm.expect(symbols).to.eql([...symbols].sort());",
+                  "});",
+                  "pm.test(\"Every instrument has a positive price and an update time\", function () {",
+                  "    list.forEach(i => {",
+                  "        pm.expect(i).to.have.all.keys(\"symbol\", \"name\", \"currentPrice\", \"updatedAt\");",
+                  "        pm.expect(i.currentPrice).to.be.a(\"number\").above(0);",
+                  "    });",
+                  "});",
+                  "// Remember KO's price so the last request in this folder can put it back",
+                  "pm.collectionVariables.set(\"koOriginalPrice\", list.find(i => i.symbol === \"KO\").currentPrice);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update price",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/instruments/KO/price",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "instruments",
+                "KO",
+                "price"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 71.25\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Price is updated\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.symbol).to.eql(\"KO\");",
+                  "    pm.expect(body.currentPrice).to.eql(71.25);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update price - lowercase symbol is normalised",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/instruments/ko/price",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "instruments",
+                "ko",
+                "price"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 71.25\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Symbol comes back upper-case\", () => pm.expect(pm.response.json().symbol).to.eql(\"KO\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update price - zero price (400)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/instruments/KO/price",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "instruments",
+                "KO",
+                "price"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Reports the price field\", function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message).to.eql(\"Validation failed\");",
+                  "    pm.expect(body.fieldErrors.map(e => e.field)).to.include(\"price\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update price - three decimals (400)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/instruments/KO/price",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "instruments",
+                "KO",
+                "price"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 12.345\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Reports the price field\", () => pm.expect(pm.response.json().fieldErrors[0].field).to.eql(\"price\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update price - unknown symbol (404)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/instruments/NOPE/price",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "instruments",
+                "NOPE",
+                "price"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Names the missing instrument\", () => pm.expect(pm.response.json().message).to.eql(\"Instrument not found: NOPE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Restore original price",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/instruments/KO/price",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "instruments",
+                "KO",
+                "price"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": {{koOriginalPrice}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Price restored\", () =>",
+                  "    pm.expect(pm.response.json().currentPrice).to.eql(Number(pm.collectionVariables.get(\"koOriginalPrice\"))));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Portfolio",
+      "description": "GET /api/users/{id}/portfolio",
+      "item": [
+        {
+          "name": "Get portfolio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}",
+                "portfolio"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test(\"Has cash, holdings and totals\", function () {",
+                  "    pm.expect(p).to.have.all.keys(\"userId\", \"name\", \"cashBalance\", \"holdings\", \"totalMarketValue\",",
+                  "        \"totalCostBasis\", \"totalUnrealizedPnl\", \"totalValue\");",
+                  "    pm.expect(p.userId).to.eql(Number(pm.environment.get(\"userId\")));",
+                  "    pm.expect(p.holdings).to.be.an(\"array\");",
+                  "});",
+                  "// Work in cents so floating-point JSON numbers compare exactly",
+                  "const cents = n => Math.round(n * 100);",
+                  "pm.test(\"totalValue = cash + market value of holdings\", () =>",
+                  "    pm.expect(cents(p.totalValue)).to.eql(cents(p.cashBalance) + cents(p.totalMarketValue)));",
+                  "pm.test(\"Each holding's P&L = market value - cost basis\", function () {",
+                  "    p.holdings.forEach(h => pm.expect(cents(h.unrealizedPnl)).to.eql(cents(h.marketValue) - cents(h.costBasis)));",
+                  "});",
+                  "pm.collectionVariables.set(\"cashBefore\", p.cashBalance);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get portfolio - unknown user (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{unknownUserId}}/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{unknownUserId}}",
+                "portfolio"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Names the missing user\", () =>",
+                  "    pm.expect(pm.response.json().message).to.eql(\"User not found: \" + pm.environment.get(\"unknownUserId\")));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "description": "POST and GET /api/users/{id}/orders. BUY then SELL the same share so a run leaves cash and holdings unchanged.",
+      "item": [
+        {
+          "name": "Place BUY order (FILLED)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"KO\",\n  \"side\": \"BUY\",\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201\", () => pm.response.to.have.status(201));",
+                  "const o = pm.response.json();",
+                  "pm.test(\"Order is FILLED at the current price\", function () {",
+                  "    pm.expect(o.symbol).to.eql(\"KO\");",
+                  "    pm.expect(o.side).to.eql(\"BUY\");",
+                  "    pm.expect(o.quantity).to.eql(1);",
+                  "    pm.expect(o.status).to.eql(\"FILLED\");",
+                  "    pm.expect(o.rejectionReason).to.be.null;",
+                  "    pm.expect(o.priceAtExecution).to.eql(Number(pm.collectionVariables.get(\"koOriginalPrice\")));",
+                  "});",
+                  "pm.collectionVariables.set(\"buyOrderId\", o.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Portfolio reflects the BUY",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}",
+                "portfolio"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "const cents = n => Math.round(n * 100);",
+                  "pm.test(\"Cash went down by the price of one KO share\", () =>",
+                  "    pm.expect(cents(p.cashBalance)).to.eql(",
+                  "        cents(pm.collectionVariables.get(\"cashBefore\")) - cents(pm.collectionVariables.get(\"koOriginalPrice\"))));",
+                  "pm.test(\"Holds KO\", () => pm.expect(p.holdings.map(h => h.symbol)).to.include(\"KO\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Place SELL order (FILLED)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"ko\",\n  \"side\": \"SELL\",\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201\", () => pm.response.to.have.status(201));",
+                  "const o = pm.response.json();",
+                  "pm.test(\"Order is FILLED and symbol is normalised\", function () {",
+                  "    pm.expect(o.symbol).to.eql(\"KO\");",
+                  "    pm.expect(o.side).to.eql(\"SELL\");",
+                  "    pm.expect(o.status).to.eql(\"FILLED\");",
+                  "});",
+                  "pm.collectionVariables.set(\"sellOrderId\", o.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Place BUY order - insufficient cash (REJECTED, 201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"AAPL\",\n  \"side\": \"BUY\",\n  \"quantity\": 1000000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201: a rejected order is still a created resource\", () => pm.response.to.have.status(201));",
+                  "const o = pm.response.json();",
+                  "pm.test(\"Order is REJECTED with a reason\", function () {",
+                  "    pm.expect(o.status).to.eql(\"REJECTED\");",
+                  "    pm.expect(o.rejectionReason).to.match(/^Insufficient cash/);",
+                  "});",
+                  "pm.collectionVariables.set(\"rejectedOrderId\", o.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Place SELL order - insufficient holdings (REJECTED, 201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"MSFT\",\n  \"side\": \"SELL\",\n  \"quantity\": 1000000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201\", () => pm.response.to.have.status(201));",
+                  "const o = pm.response.json();",
+                  "pm.test(\"Order is REJECTED with a reason\", function () {",
+                  "    pm.expect(o.status).to.eql(\"REJECTED\");",
+                  "    pm.expect(o.rejectionReason).to.match(/^Insufficient holdings/);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Place order - zero quantity (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"AAPL\",\n  \"side\": \"BUY\",\n  \"quantity\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Reports the quantity field\", () =>",
+                  "    pm.expect(pm.response.json().fieldErrors.map(e => e.field)).to.eql([\"quantity\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Place order - empty body lists every field (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Reports symbol, side and quantity\", () =>",
+                  "    pm.expect(pm.response.json().fieldErrors.map(e => e.field)).to.have.members([\"symbol\", \"side\", \"quantity\"]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Place order - invalid side (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"AAPL\",\n  \"side\": \"HOLD\",\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Explains the allowed sides\", () => pm.expect(pm.response.json().message).to.include(\"BUY or SELL\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Place order - unknown symbol (404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"NOPE\",\n  \"side\": \"BUY\",\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Names the missing instrument\", () => pm.expect(pm.response.json().message).to.eql(\"Instrument not found: NOPE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Place order - unknown user (404)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{unknownUserId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{unknownUserId}}",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"AAPL\",\n  \"side\": \"BUY\",\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Names the missing user\", () => pm.expect(pm.response.json().message).to.match(/^User not found/));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get order history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/orders?page=0&size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "5"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const page = pm.response.json();",
+                  "pm.test(\"Is a page of at most 5 orders\", function () {",
+                  "    pm.expect(page).to.have.all.keys(\"content\", \"page\", \"size\", \"totalElements\", \"totalPages\");",
+                  "    pm.expect(page.page).to.eql(0);",
+                  "    pm.expect(page.size).to.eql(5);",
+                  "    pm.expect(page.content.length).to.be.at.most(5);",
+                  "});",
+                  "pm.test(\"Newest first: this run's orders lead the list\", function () {",
+                  "    const ids = page.content.map(o => o.id);",
+                  "    const sell = Number(pm.collectionVariables.get(\"sellOrderId\"));",
+                  "    const buy = Number(pm.collectionVariables.get(\"buyOrderId\"));",
+                  "    const rejected = Number(pm.collectionVariables.get(\"rejectedOrderId\"));",
+                  "    pm.expect(ids).to.include.members([rejected, sell, buy]);",
+                  "    pm.expect(ids.indexOf(rejected)).to.be.below(ids.indexOf(sell));",
+                  "    pm.expect(ids.indexOf(sell)).to.be.below(ids.indexOf(buy));",
+                  "});",
+                  "pm.test(\"REJECTED orders are kept in history\", () =>",
+                  "    pm.expect(page.content.map(o => o.status)).to.include(\"REJECTED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get order history - size above cap (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/orders?size=101",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "101"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Reports the size parameter\", () => pm.expect(pm.response.json().fieldErrors[0].field).to.eql(\"size\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get order history - unknown user (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{unknownUserId}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{unknownUserId}}",
+                "orders"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "description": "GET /api/users/{id}/transactions",
+      "item": [
+        {
+          "name": "Get transaction history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/transactions?page=0&size=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}",
+                "transactions"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "5"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "const page = pm.response.json();",
+                  "pm.test(\"Newest transactions match this run's SELL then BUY\", function () {",
+                  "    const [sell, buy] = page.content;",
+                  "    pm.expect(sell.orderId).to.eql(Number(pm.collectionVariables.get(\"sellOrderId\")));",
+                  "    pm.expect(sell.type).to.eql(\"SELL\");",
+                  "    pm.expect(buy.orderId).to.eql(Number(pm.collectionVariables.get(\"buyOrderId\")));",
+                  "    pm.expect(buy.type).to.eql(\"BUY\");",
+                  "    pm.expect(sell.amount).to.eql(buy.amount);",
+                  "});",
+                  "pm.test(\"Rejected orders create no transaction\", () =>",
+                  "    pm.expect(page.content.map(t => t.orderId)).to.not.include(Number(pm.collectionVariables.get(\"rejectedOrderId\"))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get transaction history - negative page (400)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/transactions?page=-1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}",
+                "transactions"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "-1"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Reports the page parameter\", () => pm.expect(pm.response.json().fieldErrors[0].field).to.eql(\"page\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get transaction history - unknown user (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{unknownUserId}}/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{unknownUserId}}",
+                "transactions"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Portfolio cash is back where it started",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}/portfolio",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}",
+                "portfolio"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"BUY + SELL of one share at the same price nets to zero\", () =>",
+                  "    pm.expect(pm.response.json().cashBalance).to.eql(Number(pm.collectionVariables.get(\"cashBefore\"))));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

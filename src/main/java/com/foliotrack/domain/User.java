@@ -42,6 +42,15 @@ public class User {
         this.cashBalance = cashBalance;
     }
 
+    // The service checks affordability first; the DB's CHECK (cash_balance >= 0) is the last line of defence
+    public void debit(BigDecimal amount) {
+        this.cashBalance = cashBalance.subtract(amount);
+    }
+
+    public void credit(BigDecimal amount) {
+        this.cashBalance = cashBalance.add(amount);
+    }
+
     public Long getId() {
         return id;
     }

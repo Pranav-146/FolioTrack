@@ -11,6 +11,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Entity
 @Table(name = "holdings")
@@ -43,6 +44,22 @@ public class Holding {
         this.instrument = instrument;
         this.quantity = quantity;
         this.avgCost = avgCost;
+    }
+
+    // Weighted average: (old shares x old avg + new shares x price) / total shares.
+    // Division can produce endless decimals (e.g. 3137.50 / 15), so we must pick a scale and rounding mode;
+    // scale 2 matches the avg_cost column and HALF_UP is ordinary "round half away from zero".
+    public void addShares(int sharesBought, BigDecimal price) {
+        int newQuantity = Math.addExact(quantity, sharesBought);
+        BigDecimal totalCost = avgCost.multiply(BigDecimal.valueOf(quantity))
+                .add(price.multiply(BigDecimal.valueOf(sharesBought)));
+        this.avgCost = totalCost.divide(BigDecimal.valueOf(newQuantity), 2, RoundingMode.HALF_UP);
+        this.quantity = newQuantity;
+    }
+
+    // Selling doesn't change the average cost of the shares that remain
+    public void removeShares(int sharesSold) {
+        this.quantity -= sharesSold;
     }
 
     public Long getId() {

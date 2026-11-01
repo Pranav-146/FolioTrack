@@ -11,6 +11,8 @@ import com.foliotrack.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -96,6 +98,19 @@ class AskServiceTest {
 
         assertThat(response.sql()).isEqualTo(GENERATED_SQL);
         assertThat(response.rowCount()).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "```\n" + GENERATED_SQL + "\n```",
+            "```SQL\n" + GENERATED_SQL + "\n```",
+            "Here is the query:\n```sql\n  " + GENERATED_SQL + "  \n```\nHope that helps."})
+    void extractsSqlFromAnyFenceStyle(String reply) {
+        when(userRepository.existsById(USER_ID)).thenReturn(true);
+        when(llmClient.complete(anyString(), anyString())).thenReturn(reply).thenReturn("Summary");
+        when(queryExecutor.run(USER_ID, WRAPPED_SQL)).thenReturn(List.of());
+
+        assertThat(askService.ask(USER_ID, QUESTION).sql()).isEqualTo(GENERATED_SQL);
     }
 
     // Prompt injection: the question talks the model into reading another table. The validator stops it.

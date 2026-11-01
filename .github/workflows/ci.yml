@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Least privilege: the jobs only need to read the repo
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build, test, coverage, Sonar, Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history so SonarCloud can blame lines and tell new code from old
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      # Compiles, runs all unit/controller tests (LLM is mocked, no DB needed) and writes the JaCoCo report
+      - name: Build and test
+        run: ./mvnw -B verify
+
+      - name: Upload JaCoCo and test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports
+          path: |
+            target/site/jacoco/
+            target/surefire-reports/
+
+      # Secrets aren't available to PRs from forks, so only scan pushes and same-repo PRs.
+      # qualitygate.wait makes this step fail if the SonarCloud quality gate fails.
+      - name: SonarCloud scan
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: ./mvnw -B sonar:sonar -Dsonar.qualitygate.wait=true
+
+      - name: Build Docker image
+        run: docker build -t foliotrack:${{ github.sha }} .
+
+  api-smoke-test:
+    name: API smoke test (docker compose + Newman)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Throwaway passwords for a throwaway database. LLM_API_KEY stays empty: the app starts fine
+      # without it and the collection doesn't call /ask.
+      - name: Create .env from the example
+        run: cp .env.example .env
+
+      - name: Start app and database
+        run: docker compose up -d --build
+
+      # depends_on only waits for the DB; poll the API until Spring Boot has finished starting
+      - name: Wait for the API
+        run: curl -sf -o /dev/null --retry 30 --retry-delay 2 --retry-all-errors http://localhost:8080/api/instruments
+
+      - name: Run Postman collection with Newman
+        run: >
+          npx --yes newman@6
+          run postman/FolioTrack.postman_collection.json
+          -e postman/FolioTrack.local.postman_environment.json
+
+      - name: App logs
+        if: failure()
+        run: docker compose logs app
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

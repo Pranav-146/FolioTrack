@@ -69,10 +69,15 @@ jobs:
       - name: Wait for the API
         run: curl -sf -o /dev/null --retry 30 --retry-delay 2 --retry-all-errors http://localhost:8080/api/instruments
 
+      # Supply-chain hygiene (Sonar githubactions:S6505): an exact pinned version, installed with
+      # --ignore-scripts so no package's preinstall/postinstall hooks run on the runner, and then the
+      # installed binary is called directly. No npx, so nothing can be fetched on demand.
+      - name: Install Newman
+        run: npm install --global --ignore-scripts newman@6.2.3
+
       - name: Run Postman collection with Newman
         run: >
-          npx --yes newman@6
-          run postman/FolioTrack.postman_collection.json
+          newman run postman/FolioTrack.postman_collection.json
           -e postman/FolioTrack.local.postman_environment.json
 
       - name: App logs

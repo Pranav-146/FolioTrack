@@ -1,14 +1,9 @@
 # FolioTrack — Project Specification
 
-You are helping me build a resume project for a Fidelity Investments software engineering internship interview. I have 2 DAYS. Scope discipline matters more than features. I must be able to explain every line of code in an interview, so explain key design decisions as you go and keep the code clean and idiomatic, not clever.
+## Goal
+A small, time-boxed (2-day) portfolio and trade management backend in the finance domain. It covers Java/OOP, SQL and database concepts, REST web services, TDD and test automation, CI/CD (GitHub Actions, SonarCloud, with a Jenkins reference), Docker, a Git/GitHub workflow with user stories, a React front end, and GenAI with prompt engineering.
 
-## About me
-- 2nd-year B.Tech CSE student. Comfortable with Python, Go, C++, REST APIs, FastAPI, Docker, SQLite.
-- NEW to: Java/Spring Boot, PostgreSQL beyond basics, JUnit/Mockito, CI/CD, SonarCloud, React.
-- So: explain Spring Boot concepts briefly when they first appear (dependency injection, @Transactional, JPA, etc.).
-
-## Why this project
-The job description emphasizes: Java/OOP, SQL and database concepts, REST web services, SDLC, TDD and test automation, CI/CD (Jenkins/Sonar), Docker, Git/GitHub workflow with user stories, React/JavaScript, and GenAI/prompt writing. Fidelity is a brokerage, so the project is in the finance domain.
+Scope discipline matters more than features. Code should be clean and idiomatic, not clever, and every key design decision should be explained as it is made. Explain Spring Boot concepts briefly when they first appear (dependency injection, @Transactional, JPA, etc.).
 
 ## Project: FolioTrack, a Portfolio & Trade Management Platform
 A backend-first web app where a user holds cash and stocks, places buy/sell market orders, views holdings and P&L, sees transaction history, and asks natural-language questions about their portfolio through a GenAI feature.
@@ -75,31 +70,31 @@ Flow: question -> LLM generates SQL -> validate -> execute read-only -> LLM summ
 - Multi-stage Dockerfile for the app.
 - docker-compose.yml: postgres + app, healthcheck on db, env vars via .env (.env.example committed, .env gitignored).
 - GitHub Actions workflow on push/PR: setup Java, mvn verify, JaCoCo, SonarCloud scan (token from repo secrets).
-- Include a short note in the README on how this maps to a Jenkins pipeline (stages: checkout, build, test, Sonar quality gate, docker build), since the JD mentions Jenkins.
+- Include a short note in the README on how this maps to a Jenkins pipeline (stages: checkout, build, test, Sonar quality gate, docker build), as a reference for Jenkins users.
 
 ## Process / GitHub hygiene
-- Help me write 6-8 user stories with acceptance criteria and story-point estimates for a GitHub Projects board.
+- 6-8 user stories with acceptance criteria and story-point estimates for a GitHub Projects board.
 - Small, meaningful commits; feature branches; PRs into main.
 
-## Build plan (follow this order, stop after each phase so I can review and understand before moving on)
+## Build plan (follow this order, stop after each phase for review before moving on)
 DAY 1 - Core backend
   Phase 1: Project skeleton, Docker Compose Postgres, Flyway schema + seed data, app boots, Swagger UI works.
   Phase 2: Entities, repositories, DTOs, instrument + portfolio endpoints.
   Phase 3: Order execution service written test-first (tests then implementation), concurrency handling, order/transaction history endpoints, global exception handler.
   Phase 4: Controller tests, Postman collection.
-DAY 2 - JD keywords and polish
+DAY 2 - Features and polish
   Phase 5: GenAI ask feature: views, read-only role, validator + tests, LLM client interface + implementation, summarization.
   Phase 6: Dockerfile, full docker-compose, GitHub Actions + JaCoCo + SonarCloud.
   Phase 7 (only if time): minimal React dashboard (portfolio table, order form, ask box).
-  Phase 8: README (overview, architecture diagram in Mermaid, setup, API table, design decisions, testing, CI, screenshots placeholders), user stories, final cleanup.
+  Phase 8: README (overview, architecture diagram in Mermaid, setup, API table, design decisions, testing, CI, screenshots), user stories, final cleanup.
 
-## After each phase, give me
+## After each phase, provide
 1. What was built and the files changed
-2. 2-3 key design decisions and WHY (interview-ready explanations)
+2. 2-3 key design decisions and WHY (concise explanations)
 3. How to run/verify it
-4. 2-3 likely interview questions about this phase with short answers
+4. 2-3 likely review questions about this phase with short answers
 
 ## Constraints
-- If something is taking too long, tell me and suggest what to cut. Protect phases 1-6.
+- If something is taking too long, flag it and suggest what to cut. Protect phases 1-6.
 - No unnecessary abstractions, no features beyond this spec.
 - Never hardcode secrets.

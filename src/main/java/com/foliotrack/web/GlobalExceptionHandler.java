@@ -3,7 +3,9 @@ package com.foliotrack.web;
 import com.foliotrack.dto.ApiError;
 import com.foliotrack.dto.ApiError.FieldViolation;
 import com.foliotrack.exception.InvalidOrderException;
+import com.foliotrack.exception.LlmUnavailableException;
 import com.foliotrack.exception.NotFoundException;
+import com.foliotrack.exception.QueryRejectedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -41,6 +43,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(InvalidOrderException.class)
     public ResponseEntity<Object> handleInvalidOrder(InvalidOrderException ex, WebRequest request) {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request, List.of());
+    }
+
+    // The request was valid, but the SQL generated for it was refused or failed, so it can't be answered.
+    // The message is already client-safe (see QueryRejectedException).
+    @ExceptionHandler(QueryRejectedException.class)
+    public ResponseEntity<Object> handleQueryRejected(QueryRejectedException ex, WebRequest request) {
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), request, List.of());
+    }
+
+    // The LLM provider is down, rate limiting, or not configured: a dependency problem, not the client's fault
+    @ExceptionHandler(LlmUnavailableException.class)
+    public ResponseEntity<Object> handleLlmUnavailable(LlmUnavailableException ex, WebRequest request) {
+        return build(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), request, List.of());
     }
 
     // A DB constraint (CHECK, UNIQUE, FK, numeric range) refused the write. The transaction has rolled back,

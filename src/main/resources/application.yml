@@ -26,6 +26,9 @@ spring:
       read-timeout: 30s
 
 foliotrack:
+  cors:
+    # The only browser origin allowed to call the API: the Vite dev server for the React dashboard
+    allowed-origin: ${CORS_ALLOWED_ORIGIN:http://localhost:5173}
   # Second connection pool, logged in as the role that can only SELECT from the v_my_* views.
   # LLM-generated SQL only ever runs here, never on the main (schema-owning) connection.
   readonly-datasource:

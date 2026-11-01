@@ -15,6 +15,30 @@ spring:
       ddl-auto: validate
     # Don't keep DB sessions open during view rendering; all DB work happens in the service layer.
     open-in-view: false
+  flyway:
+    placeholders:
+      # V3 creates the read-only role with this password, so it never appears in a committed migration
+      readonly_password: ${DB_READONLY_PASSWORD}
+  http:
+    client:
+      # Applied to the auto-configured RestClient.Builder the LLM client uses, so a slow LLM can't hang a request
+      connect-timeout: 5s
+      read-timeout: 30s
+
+foliotrack:
+  # Second connection pool, logged in as the role that can only SELECT from the v_my_* views.
+  # LLM-generated SQL only ever runs here, never on the main (schema-owning) connection.
+  readonly-datasource:
+    jdbc-url: ${spring.datasource.url}
+    username: ${DB_READONLY_USER:foliotrack_readonly}
+    password: ${DB_READONLY_PASSWORD}
+    maximum-pool-size: 2
+  llm:
+    provider: ${LLM_PROVIDER:gemini}
+    # Blank by default so the app (and CI) start without a key; /ask then returns 503 until one is set
+    api-key: ${LLM_API_KEY:}
+    model: ${LLM_MODEL:gemini-3.6-flash}
+    base-url: ${LLM_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
 
 springdoc:
   swagger-ui:

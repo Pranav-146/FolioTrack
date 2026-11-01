@@ -26,6 +26,21 @@ jobs:
           java-version: '25'
           cache: maven
 
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # Proves the React dashboard still compiles. npm ci installs exactly what package-lock.json pins, and
+      # --ignore-scripts (also set in frontend/.npmrc) keeps dependency install hooks from running, the same
+      # rule as the Newman install below. The Maven Sonar scan only covers src/main, so /frontend isn't analysed.
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+
       # Compiles, runs all unit/controller tests (LLM is mocked, no DB needed) and writes the JaCoCo report
       - name: Build and test
         run: ./mvnw -B verify

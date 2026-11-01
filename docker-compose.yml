@@ -1,7 +1,13 @@
 services:
   db:
     image: postgres:16-alpine
-    env_file: .env
+    # Only the three variables Postgres needs, interpolated from .env by Compose. No env_file here: that would
+    # hand the database container every secret in .env (LLM key, read-only role password) for no reason.
+    # ${VAR:?msg} stops `docker compose up` with a clear error if the variable is missing.
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
@@ -12,6 +18,22 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  app:
+    build: .
+    # The app does need everything in .env: DB credentials, the read-only role's password, LLM settings
+    env_file: .env
+    environment:
+      # Inside the Compose network the database is the `db` service on its container port,
+      # not localhost:${DB_PORT} as seen from the host
+      DB_HOST: db
+      DB_PORT: "5432"
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        # Wait for pg_isready, not just for the container to start, so Flyway doesn't race Postgres
+        condition: service_healthy
 
 volumes:
   pgdata:

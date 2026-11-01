@@ -36,9 +36,10 @@ public class AskService {
     private static final String OUT_OF_SCOPE_ANSWER = "I can only answer questions about your own cash, holdings, "
             + "orders and transactions. Try asking something like \"What is my biggest holding?\"";
 
-    // Models often wrap SQL in ```sql ... ``` despite being told not to; take what's inside the fence
-    private static final Pattern CODE_FENCE = Pattern.compile("```(?:sql)?\\s*(.*?)\\s*```",
-            Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
+    // Models often wrap SQL in ```sql ... ``` despite being told not to; take what's inside the fence.
+    // [^`]* can't overlap with the fences around it, so matching is linear (no catastrophic backtracking);
+    // the surrounding whitespace is stripped afterwards instead of by the regex.
+    private static final Pattern CODE_FENCE = Pattern.compile("```(?:sql)?([^`]*)```", Pattern.CASE_INSENSITIVE);
 
     private final LlmClient llmClient;
     private final SqlValidator sqlValidator;

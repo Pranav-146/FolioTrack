@@ -110,7 +110,8 @@ public class OrderService {
         Optional<Holding> existing = holdingRepository.findByUserAndInstrument(user, instrument);
         int sharesHeld = existing.map(Holding::getQuantity).orElse(0);
 
-        if (sharesHeld < quantity) {
+        // isEmpty() is implied by sharesHeld < quantity (quantity > 0), but stating it makes get() below provably safe
+        if (existing.isEmpty() || sharesHeld < quantity) {
             return recordRejected(user, instrument, OrderSide.SELL, quantity,
                     "Insufficient holdings: requested %d shares, held %d".formatted(quantity, sharesHeld));
         }

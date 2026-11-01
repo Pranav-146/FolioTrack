@@ -21,6 +21,16 @@
         <java.version>25</java.version>
         <springdoc.version>2.8.17</springdoc.version>
         <jsqlparser.version>5.3</jsqlparser.version>
+        <jacoco.version>0.8.15</jacoco.version>
+        <sonar-maven-plugin.version>5.8.0.7211</sonar-maven-plugin.version>
+
+        <!-- SonarCloud project; the token comes from the SONAR_TOKEN env var, never from this file -->
+        <sonar.organization>pranav-146</sonar.organization>
+        <sonar.projectKey>Pranav-146_FolioTrack</sonar.projectKey>
+        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+
+        <!-- Filled in by jacoco:prepare-agent; empty default so @{argLine} below always resolves -->
+        <argLine/>
     </properties>
 
     <dependencies>
@@ -73,10 +83,67 @@
     </dependencies>
 
     <build>
+        <pluginManagement>
+            <plugins>
+                <!-- Pinned so `./mvnw sonar:sonar` is reproducible -->
+                <plugin>
+                    <groupId>org.sonarsource.scanner.maven</groupId>
+                    <artifactId>sonar-maven-plugin</artifactId>
+                    <version>${sonar-maven-plugin.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- Sets a property per dependency holding its jar path, e.g. ${org.mockito:mockito-core:jar} -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Mockito's inline mock maker needs a Java agent. Left alone it attaches itself at runtime, which
+                 Java 21+ warns about and a future JDK will block, so we load it explicitly at JVM start.
+                 @{argLine} is late-bound so JaCoCo's agent (set by prepare-agent) is kept alongside it. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>@{argLine} -javaagent:${org.mockito:mockito-core:jar}</argLine>
+                </configuration>
+            </plugin>
+
+            <!-- Coverage: prepare-agent instruments the test JVM, report writes target/site/jacoco/
+                 (index.html for people, jacoco.xml for SonarCloud) during `verify` -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

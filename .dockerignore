@@ -1,0 +1,11 @@
+# Keep secrets, build output and unrelated files out of the build context
+.env
+.git/
+target/
+.idea/
+.vscode/
+postman/
+*.md
+Dockerfile
+Jenkinsfile
+.github/
